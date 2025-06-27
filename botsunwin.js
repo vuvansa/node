@@ -1,8 +1,7 @@
-// --- START OF FILE botsunwin_final_fixed.js ---
+// --- START OF FILE botsunwin_pm2_final.js ---
 
 const { Telegraf } = require('telegraf');
 const { readFileSync, writeFileSync, existsSync } = require('fs');
-const { HttpsProxyAgent } = require('https-proxy-agent');
 
 // --- Cấu hình Bot ---
 const BOT_TOKEN = '7537898028:AAHZwSZpQgnG_WIj5h0nlbfpB79-IvPucXo';
@@ -12,7 +11,7 @@ const API_INTERVAL = 3000;
 
 // --- Khởi tạo Bot ---
 const bot = new Telegraf(BOT_TOKEN);
-console.log('Bot khởi động không dùng Proxy.');
+console.log('Bot khởi động...');
 
 // --- Tên file lưu trữ dữ liệu ---
 const USERS_FILE = 'users.json';
@@ -35,12 +34,12 @@ predictionHistory = loadData(PREDICTION_HISTORY_FILE, []);
 const isAdmin = (userId) => users[userId] && users[userId].isAdmin;
 const isMainAdmin = (userId) => userId === ADMIN_ID;
 
-// --- Hàm định dạng dữ liệu (ĐÃ SỬA LẠI TÊN KEY) ---
+// --- Hàm định dạng dữ liệu (ĐÃ THÊM ĐỘ TIN CẬY) ---
 function formatPredictionData(data) {
     if (!data) return "Chưa có dữ liệu dự đoán.";
     
-    // Sửa các key thành chữ thường để khớp với API
-    const { phien_truoc, ket_qua, Dice, phien_hien_tai, du_doan, cau } = data;
+    // Thêm "do_tin_cay" vào danh sách lấy ra
+    const { phien_truoc, ket_qua, Dice, phien_hien_tai, du_doan, cau, do_tin_cay } = data;
 
     return `
 🎰 *TOOl SUNWIN V1*
@@ -51,12 +50,13 @@ function formatPredictionData(data) {
 ═════════════════════════════ 
 *PHIÊN HIỆN TẠI*: \`${phien_hien_tai || 'N/A'}\`
 *DỰ ĐOÁN*: *${du_doan || 'N/A'}*
+*ĐỘ TIN CẬY*: \`${do_tin_cay || 'N/A'}\`
 *CẦU*: ${cau || 'N/A'}
 ═════════════════════════════ 
 `.trim();
 }
 
-// --- Hàm gọi API (ĐÃ SỬA LẠI TÊN KEY) ---
+// --- Hàm gọi API ---
 async function fetchAndProcessApiData() {
     try {
         const fetch = (await import('node-fetch')).default;
@@ -69,18 +69,12 @@ async function fetchAndProcessApiData() {
 
         const data = await response.json();
         
-        // Sửa key thành chữ thường để khớp với API
         if (data && data.phien_hien_tai) {
             if (data.phien_hien_tai !== lastDisplayedSession) {
                 console.log(`[${new Date().toLocaleTimeString()}] Phiên mới: ${data.phien_hien_tai}. Gửi thông báo...`);
                 lastDisplayedSession = data.phien_hien_tai;
 
-                predictionHistory.push({
-                    timestamp: new Date().toISOString(),
-                    session: data.phien_hien_tai,
-                    data: data
-                });
-                saveData(PREDICTION_HISTORY_FILE, predictionHistory);
+                saveData(PREDICTION_HISTORY_FILE, [...predictionHistory, { timestamp: new Date().toISOString(), session: data.phien_hien_tai, data: data }]);
 
                 const formattedMessage = formatPredictionData(data);
                 for (const userId in users) {
@@ -97,7 +91,7 @@ async function fetchAndProcessApiData() {
     }
 }
 
-// --- Các lệnh của Bot (không thay đổi) ---
+// --- Các lệnh của Bot ---
 bot.start((ctx) => { const userId = ctx.from.id; const userName = ctx.from.username || ctx.from.first_name; if (!users[userId]) { users[userId] = { active: true, isAdmin: false }; saveData(USERS_FILE, users); } else { users[userId].active = true; saveData(USERS_FILE, users); } if (isAdmin(userId)) { ctx.reply(`Chào mừng Admin ${userName}! 👋\n\n*Lệnh Admin:*\n/addadmin <id> | /xoaadmin <id> | /check | /thongbao <msg>\n\n*Lệnh chung:*\n/chaybot | /tatbot`); } else { ctx.reply(`Chào mừng ${userName} đến với Bot Sunwin! 🎉\n\nBot sẽ tự động gửi dự đoán cho bạn.\nSử dụng /tatbot để dừng và /chaybot để bật lại.`); } });
 bot.command('chaybot', (ctx) => { const userId = ctx.from.id; if (!users[userId]) users[userId] = { active: true, isAdmin: false }; users[userId].active = true; saveData(USERS_FILE, users); ctx.reply('✅ Đã bật nhận dự đoán.'); });
 bot.command('tatbot', (ctx) => { const userId = ctx.from.id; if (users[userId]) users[userId].active = false; saveData(USERS_FILE, users); ctx.reply('❌ Đã tắt nhận dự đoán.'); });
@@ -108,9 +102,9 @@ bot.command('thongbao', (ctx) => { if (!isAdmin(ctx.from.id)) return; const mess
 
 // --- Khởi động bot ---
 bot.launch().then(() => {
-    console.log('Bot Sunwin đã khởi động thành công!');
+    console.log('Bot đã kết nối với Telegram thành công!');
     setInterval(fetchAndProcessApiData, API_INTERVAL);
-    fetchAndProcessApiData(); // Gọi ngay lần đầu
+    fetchAndProcessApiData();
 }).catch((err) => {
     console.error('Lỗi khi khởi động Bot:', err);
 });
