@@ -5,28 +5,23 @@ const { readFileSync, writeFileSync, existsSync } = require('fs');
 // Dòng require('node-fetch') đã được XÓA ở đây.
 // Chúng ta sẽ import nó theo cách khác bên dưới.
 
-// Cài đặt một trong hai thư viện proxy này, tùy thuộc vào loại proxy bạn có
-const { HttpsProxyAgent } = require('https-proxy-agent'); // Dành cho HTTP/HTTPS proxy
-// const { SocksProxyAgent } = require('socks-proxy-agent'); // Dành cho SOCKS proxy
+const { HttpsProxyAgent } = require('https-proxy-agent');
 
 // --- Cấu hình Bot ---
-// !!! QUAN TRỌNG: Hãy thay thế bằng token MỚI của bạn sau khi đã thu hồi token cũ !!!
-const BOT_TOKEN = 'YOUR_NEW_BOT_TOKEN'; // THAY THẾ TOKEN CỦA BẠN VÀO ĐÂY
-const ADMIN_ID = 5524246727; // ID của admin chính
+// !!! THAY THẾ BẰNG TOKEN MỚI CỦA BẠN !!!
+const BOT_TOKEN = 'YOUR_NEW_BOT_TOKEN'; 
+const ADMIN_ID = 5524246727;
 const API_URL = 'http://157.10.52.15:3000/api/sunwin?key=axotaixiu'; 
-const API_INTERVAL = 3000; // Tần suất gọi API (3 giây)
+const API_INTERVAL = 3000;
 
 // --- Cấu hình Proxy (Tùy chọn) ---
-const PROXY_URL = ''; // Ví dụ: 'http://user:password@your_proxy_ip:your_proxy_port'
+const PROXY_URL = '';
 
-// --- Khởi tạo Bot với cấu hình Proxy ---
+// --- Khởi tạo Bot ---
 let bot;
 if (PROXY_URL && PROXY_URL.startsWith('http')) {
     bot = new Telegraf(BOT_TOKEN, { telegram: { agent: new HttpsProxyAgent(PROXY_URL) } });
     console.log(`Bot khởi động với HTTP Proxy: ${PROXY_URL}`);
-} else if (PROXY_URL && PROXY_URL.startsWith('socks')) {
-    // bot = new Telegraf(BOT_TOKEN, { telegram: { agent: new SocksProxyAgent(PROXY_URL) } });
-    console.log(`Bot khởi động với SOCKS Proxy: ${PROXY_URL}`);
 } else {
     bot = new Telegraf(BOT_TOKEN);
     console.log('Bot khởi động không dùng Proxy.');
@@ -36,8 +31,8 @@ if (PROXY_URL && PROXY_URL.startsWith('http')) {
 const USERS_FILE = 'users.json';
 const PREDICTION_HISTORY_FILE = 'prediction_history.json';
 
-// --- Biến lưu trữ dữ liệu trong bộ nhớ ---
-let users = {}; // { "user_id": { active: boolean, isAdmin: boolean } }
+// --- Biến lưu trữ dữ liệu ---
+let users = {};
 let predictionHistory = [];
 let lastDisplayedSession = null;
 
@@ -70,12 +65,10 @@ predictionHistory = loadData(PREDICTION_HISTORY_FILE, []);
 const isAdmin = (userId) => users[userId] && users[userId].isAdmin;
 const isMainAdmin = (userId) => userId === ADMIN_ID;
 
-// --- Hàm định dạng dữ liệu API để hiển thị ---
+// --- Hàm định dạng dữ liệu ---
 function formatPredictionData(data) {
     if (!data) return "Chưa có dữ liệu dự đoán.";
-
     const { PHIEN_TRUOC, KET_QUA, DICE, PHIEN_HIEN_TAI, DU_DOAN, CAU } = data;
-
     return `
 🎰 *TOOl SUNWIN V1*
 ═════════════════════════════
@@ -90,11 +83,10 @@ function formatPredictionData(data) {
 `.trim();
 }
 
-// --- Hàm gọi API và gửi thông báo ---
+// --- Hàm gọi API ---
 async function fetchAndProcessApiData() {
     try {
         // **ĐÂY LÀ THAY ĐỔI QUAN TRỌNG ĐỂ SỬA LỖI**
-        // Tải thư viện node-fetch bằng import() động
         const fetch = (await import('node-fetch')).default;
 
         const response = await fetch(API_URL);
@@ -104,7 +96,6 @@ async function fetchAndProcessApiData() {
         }
         const data = await response.json();
 
-        // Chỉ gửi khi có phiên mới
         if (data && data.PHIEN_HIEN_TAI && data.PHIEN_HIEN_TAI !== lastDisplayedSession) {
             console.log(`Phiên mới: ${data.PHIEN_HIEN_TAI}. Gửi thông báo...`);
             lastDisplayedSession = data.PHIEN_HIEN_TAI;
@@ -123,7 +114,6 @@ async function fetchAndProcessApiData() {
                     bot.telegram.sendMessage(userId, formattedMessage, { parse_mode: 'Markdown' }).catch(e => {
                         console.error(`Không thể gửi tin nhắn tới user ${userId}:`, e.message);
                         if (e.code === 403) {
-                            console.log(`User ${userId} đã chặn bot. Đánh dấu là inactive.`);
                             users[userId].active = false;
                             saveData(USERS_FILE, users);
                         }
@@ -136,7 +126,7 @@ async function fetchAndProcessApiData() {
     }
 }
 
-// --- Lệnh /start ---
+// --- Các lệnh của Bot ---
 bot.start((ctx) => {
     const userId = ctx.from.id;
     const userName = ctx.from.username || ctx.from.first_name;
@@ -144,7 +134,6 @@ bot.start((ctx) => {
     if (!users[userId]) {
         users[userId] = { active: true, isAdmin: false };
         saveData(USERS_FILE, users);
-        console.log(`Người dùng mới: ${userId} (${userName})`);
     } else {
         users[userId].active = true;
         saveData(USERS_FILE, users);
@@ -152,108 +141,83 @@ bot.start((ctx) => {
 
     if (isAdmin(userId)) {
         ctx.reply(
-            `Chào mừng Admin ${userName}! 👋 Bot đã sẵn sàng.` +
-            '\n\n*Lệnh Admin:*\n' +
-            '/addadmin `<user_id>` - Thêm admin phụ\n' +
-            '/xoaadmin `<user_id>` - Xóa admin phụ\n' +
-            '/check - Xem danh sách người dùng\n' +
-            '/thongbao `<tin_nhắn>` - Gửi thông báo chung\n\n' +
-            '*Lệnh chung:*\n' +
-            '/chaybot - Bắt đầu nhận dự đoán\n' +
-            '/tatbot - Tạm dừng nhận dự đoán'
+            `Chào mừng Admin ${userName}! 👋` +
+            '\n\n*Lệnh Admin:*\n/addadmin <id> | /xoaadmin <id> | /check | /thongbao <msg>' +
+            '\n\n*Lệnh chung:*\n/chaybot | /tatbot'
         );
     } else {
         ctx.reply(
             `Chào mừng ${userName} đến với Bot Sunwin! 🎉` +
             '\n\nBot sẽ tự động gửi dự đoán cho bạn.' +
-            '\n\n*Các lệnh của bạn:*\n' +
-            '/chaybot - Bật nhận dự đoán (đã bật mặc định)\n' +
-            '/tatbot - Tắt nhận dự đoán'
+            '\nSử dụng /tatbot để dừng và /chaybot để bật lại.'
         );
     }
 });
 
-// --- Lệnh /chaybot ---
 bot.command('chaybot', (ctx) => {
     const userId = ctx.from.id;
-    if (!users[userId]) {
-        users[userId] = { active: true, isAdmin: false };
-    }
-    
+    if (!users[userId]) users[userId] = { active: true, isAdmin: false };
     users[userId].active = true;
     saveData(USERS_FILE, users);
-    ctx.reply('✅ Bạn đã bật nhận dự đoán. Bot sẽ gửi tin nhắn khi có phiên mới.');
+    ctx.reply('✅ Đã bật nhận dự đoán.');
 });
 
-// --- Lệnh /tatbot ---
 bot.command('tatbot', (ctx) => {
     const userId = ctx.from.id;
-    if (users[userId]) {
-        users[userId].active = false;
-        saveData(USERS_FILE, users);
-    }
-    ctx.reply('❌ Bạn đã tắt nhận dự đoán. Gõ /chaybot để bật lại.');
+    if (users[userId]) users[userId].active = false;
+    saveData(USERS_FILE, users);
+    ctx.reply('❌ Đã tắt nhận dự đoán.');
 });
 
-
-// --- Các lệnh Admin ---
 bot.command('addadmin', (ctx) => {
-    if (!isMainAdmin(ctx.from.id)) return ctx.reply('Chỉ admin chính mới có quyền này.');
+    if (!isMainAdmin(ctx.from.id)) return;
     const targetUserId = parseInt(ctx.message.text.split(' ')[1], 10);
-    if (isNaN(targetUserId)) return ctx.reply('ID người dùng không hợp lệ.');
-    if (!users[targetUserId]) users[targetUserId] = { active: true, isAdmin: false };
-    users[targetUserId].isAdmin = true;
-    saveData(USERS_FILE, users);
-    ctx.reply(`✅ Đã cấp quyền admin cho ID \`${targetUserId}\`.`);
-    bot.telegram.sendMessage(targetUserId, 'Bạn đã được cấp quyền admin.').catch(()=>{});
+    if (!isNaN(targetUserId)) {
+        if (!users[targetUserId]) users[targetUserId] = { active: true, isAdmin: false };
+        users[targetUserId].isAdmin = true;
+        saveData(USERS_FILE, users);
+        ctx.reply(`✅ Đã cấp quyền admin cho ID \`${targetUserId}\`.`);
+    }
 });
 
 bot.command('xoaadmin', (ctx) => {
-    if (!isMainAdmin(ctx.from.id)) return ctx.reply('Chỉ admin chính mới có quyền này.');
+    if (!isMainAdmin(ctx.from.id)) return;
     const targetUserId = parseInt(ctx.message.text.split(' ')[1], 10);
-    if (isNaN(targetUserId)) return ctx.reply('ID người dùng không hợp lệ.');
-    if (targetUserId === ADMIN_ID) return ctx.reply('Không thể xóa admin chính.');
-    if (users[targetUserId]) users[targetUserId].isAdmin = false;
-    saveData(USERS_FILE, users);
-    ctx.reply(`✅ Đã gỡ quyền admin của ID \`${targetUserId}\`.`);
-    bot.telegram.sendMessage(targetUserId, 'Quyền admin của bạn đã bị gỡ.').catch(()=>{});
+    if (!isNaN(targetUserId) && targetUserId !== ADMIN_ID) {
+        if (users[targetUserId]) users[targetUserId].isAdmin = false;
+        saveData(USERS_FILE, users);
+        ctx.reply(`✅ Đã gỡ quyền admin của ID \`${targetUserId}\`.`);
+    }
 });
 
 bot.command('check', (ctx) => {
-    if (!isAdmin(ctx.from.id)) return ctx.reply('Bạn không có quyền.');
-    
-    let userList = '--- *Danh sách Người dùng* ---\n\n';
+    if (!isAdmin(ctx.from.id)) return;
     const userIds = Object.keys(users);
-    
+    let userList = `--- *Danh sách Người dùng* (${userIds.length}) ---\n\n`;
     userIds.forEach(id => {
         const user = users[id];
-        const status = user.active ? '✅ Đang bật' : '❌ Đang tắt';
-        const role = user.isAdmin ? (id == ADMIN_ID ? '👑 Admin Chính' : '✨ Admin Phụ') : '👤 User';
-        userList += `ID: \`${id}\` | ${role} | ${status}\n`;
+        const status = user.active ? '✅' : '❌';
+        const role = user.isAdmin ? (id == ADMIN_ID ? '👑' : '✨') : '👤';
+        userList += `${status} ${role} ID: \`${id}\`\n`;
     });
-    userList += `\n*Tổng số người dùng:* ${userIds.length}`;
-
     ctx.replyWithMarkdown(userList);
 });
 
 bot.command('thongbao', (ctx) => {
-    if (!isAdmin(ctx.from.id)) return ctx.reply('Bạn không có quyền.');
+    if (!isAdmin(ctx.from.id)) return;
     const message = ctx.message.text.slice('/thongbao '.length).trim();
-    if (!message) return ctx.reply('Vui lòng nhập nội dung thông báo.');
-
-    const broadcastMessage = `📣 *THÔNG BÁO TỪ ADMIN:*\n\n${message}`;
+    if (!message) return;
+    const broadcastMessage = `📣 *THÔNG BÁO:*\n\n${message}`;
     Object.keys(users).forEach(userId => {
-        bot.telegram.sendMessage(userId, broadcastMessage, { parse_mode: 'Markdown' })
-            .catch(e => console.error(`Lỗi gửi thông báo tới ${userId}:`, e.message));
+        bot.telegram.sendMessage(userId, broadcastMessage, { parse_mode: 'Markdown' }).catch(()=>{});
     });
-    ctx.reply(`Đã gửi thông báo tới người dùng.`);
+    ctx.reply(`Đã gửi thông báo.`);
 });
 
 // --- Khởi động bot ---
 bot.launch().then(() => {
-    console.log('Bot Sunwin (phiên bản đã sửa lỗi) đã khởi động!');
+    console.log('Bot Sunwin đã khởi động!');
     setInterval(fetchAndProcessApiData, API_INTERVAL);
-    console.log(`Bắt đầu lấy dữ liệu API mỗi ${API_INTERVAL / 1000} giây.`);
     fetchAndProcessApiData();
 }).catch((err) => {
     console.error('Lỗi khi khởi động Bot:', err);
