@@ -9,7 +9,7 @@ const { HttpsProxyAgent } = require('https-proxy-agent');
 
 // --- Cấu hình Bot ---
 // !!! THAY THẾ BẰNG TOKEN MỚI CỦA BẠN !!!
-const BOT_TOKEN = 'YOUR_NEW_BOT_TOKEN'; 
+const BOT_TOKEN = '7537898028:AAHZwSZpQgnG_WIj5h0nlbfpB79-IvPucXo'; 
 const ADMIN_ID = 5524246727;
 const API_URL = 'http://157.10.52.15:3000/api/sunwin?key=axotaixiu'; 
 const API_INTERVAL = 3000;
