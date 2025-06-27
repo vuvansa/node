@@ -1,4 +1,4 @@
-// --- START OF FILE botsunwin_debug.js ---
+// --- START OF FILE botsunwin_final_fixed.js ---
 
 const { Telegraf } = require('telegraf');
 const { readFileSync, writeFileSync, existsSync } = require('fs');
@@ -35,81 +35,65 @@ predictionHistory = loadData(PREDICTION_HISTORY_FILE, []);
 const isAdmin = (userId) => users[userId] && users[userId].isAdmin;
 const isMainAdmin = (userId) => userId === ADMIN_ID;
 
-// --- Hàm định dạng dữ liệu ---
+// --- Hàm định dạng dữ liệu (ĐÃ SỬA LẠI TÊN KEY) ---
 function formatPredictionData(data) {
     if (!data) return "Chưa có dữ liệu dự đoán.";
-    const { PHIEN_TRUOC, KET_QUA, DICE, PHIEN_HIEN_TAI, DU_DOAN, CAU } = data;
+    
+    // Sửa các key thành chữ thường để khớp với API
+    const { phien_truoc, ket_qua, Dice, phien_hien_tai, du_doan, cau } = data;
+
     return `
 🎰 *TOOl SUNWIN V1*
 ═════════════════════════════
-*PHIÊN TRƯỚC*: \`${PHIEN_TRUOC || 'N/A'}\`
-*KẾT QUẢ*: ${KET_QUA || 'N/A'}
-*DICE*: ${DICE || 'N/A'}
+*PHIÊN TRƯỚC*: \`${phien_truoc || 'N/A'}\`
+*KẾT QUẢ*: ${ket_qua || 'N/A'}
+*DICE*: ${Dice ? Dice.join(', ') : 'N/A'}
 ═════════════════════════════ 
-*PHIÊN HIỆN TẠI*: \`${PHIEN_HIEN_TAI || 'N/A'}\`
-*DỰ ĐOÁN*: *${DU_DOAN || 'N/A'}*
-*CẦU*: ${CAU || 'N/A'}
+*PHIÊN HIỆN TẠI*: \`${phien_hien_tai || 'N/A'}\`
+*DỰ ĐOÁN*: *${du_doan || 'N/A'}*
+*CẦU*: ${cau || 'N/A'}
 ═════════════════════════════ 
 `.trim();
 }
 
-// --- HÀM GỌI API VỚI CÁC DÒNG DEBUG ---
+// --- Hàm gọi API (ĐÃ SỬA LẠI TÊN KEY) ---
 async function fetchAndProcessApiData() {
-    // DEBUG: Báo cáo khi hàm được gọi
-    console.log("-----------------------------------------");
-    console.log(`[${new Date().toLocaleTimeString()}] Đang chạy hàm fetchAndProcessApiData...`);
-    
     try {
         const fetch = (await import('node-fetch')).default;
-        
-        // DEBUG: Báo cáo URL đang gọi
-        console.log(`Đang gọi tới API: ${API_URL}`);
         const response = await fetch(API_URL);
-
-        // DEBUG: Báo cáo trạng thái HTTP
-        console.log(`API trả về mã trạng thái: ${response.status}`);
+        
         if (!response.ok) {
             console.error(`Lỗi API: HTTP status ${response.status}`);
             return;
         }
 
-        const textResponse = await response.text();
-        // DEBUG: Xem dữ liệu thô trước khi parse JSON
-        console.log("Dữ liệu thô từ API:", textResponse);
+        const data = await response.json();
         
-        const data = JSON.parse(textResponse);
-        // DEBUG: Xem dữ liệu sau khi parse JSON
-        console.log("Dữ liệu JSON đã xử lý:", data);
+        // Sửa key thành chữ thường để khớp với API
+        if (data && data.phien_hien_tai) {
+            if (data.phien_hien_tai !== lastDisplayedSession) {
+                console.log(`[${new Date().toLocaleTimeString()}] Phiên mới: ${data.phien_hien_tai}. Gửi thông báo...`);
+                lastDisplayedSession = data.phien_hien_tai;
 
-        if (data && data.PHIEN_HIEN_TAI) {
-            // DEBUG: So sánh phiên
-            console.log(`So sánh: Phiên API = ${data.PHIEN_HIEN_TAI}, Phiên đã lưu = ${lastDisplayedSession}`);
-            if(data.PHIEN_HIEN_TAI !== lastDisplayedSession) {
-                console.log(">>> PHIÊN MỚI! Chuẩn bị gửi thông báo...");
-                lastDisplayedSession = data.PHIEN_HIEN_TAI;
-
-                predictionHistory.push({ timestamp: new Date().toISOString(), session: data.PHIEN_HIEN_TAI, data: data });
+                predictionHistory.push({
+                    timestamp: new Date().toISOString(),
+                    session: data.phien_hien_tai,
+                    data: data
+                });
                 saveData(PREDICTION_HISTORY_FILE, predictionHistory);
 
                 const formattedMessage = formatPredictionData(data);
                 for (const userId in users) {
                     if (users[userId].active) {
-                        console.log(`Đang gửi tới user ID: ${userId}`);
                         bot.telegram.sendMessage(userId, formattedMessage, { parse_mode: 'Markdown' }).catch(e => {
                             console.error(`Lỗi khi gửi tới user ${userId}:`, e.message);
                         });
                     }
                 }
-            } else {
-                console.log(">>> KHÔNG có phiên mới, bỏ qua lần này.");
             }
-        } else {
-             console.log(">>> Dữ liệu API không hợp lệ hoặc thiếu PHIEN_HIEN_TAI.");
         }
-
     } catch (error) {
-        // DEBUG: Báo cáo bất kỳ lỗi nào xảy ra
-        console.error('!!! ĐÃ XẢY RA LỖI NGHIÊM TRỌNG TRONG HÀM fetchAndProcessApiData:', error);
+        console.error('Lỗi trong hàm fetchAndProcessApiData:', error);
     }
 }
 
@@ -124,9 +108,9 @@ bot.command('thongbao', (ctx) => { if (!isAdmin(ctx.from.id)) return; const mess
 
 // --- Khởi động bot ---
 bot.launch().then(() => {
-    console.log('Bot Sunwin (chế độ chẩn đoán) đã khởi động!');
+    console.log('Bot Sunwin đã khởi động thành công!');
     setInterval(fetchAndProcessApiData, API_INTERVAL);
-    fetchAndProcessApiData();
+    fetchAndProcessApiData(); // Gọi ngay lần đầu
 }).catch((err) => {
     console.error('Lỗi khi khởi động Bot:', err);
 });
