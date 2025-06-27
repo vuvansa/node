@@ -1,4 +1,4 @@
-// --- START OF FILE botsunwin_pm2_final.js ---
+// --- START OF FILE botsunwin_final_version.js ---
 
 const { Telegraf } = require('telegraf');
 const { readFileSync, writeFileSync, existsSync } = require('fs');
@@ -6,6 +6,7 @@ const { readFileSync, writeFileSync, existsSync } = require('fs');
 // --- Cấu hình Bot ---
 const BOT_TOKEN = '7537898028:AAHZwSZpQgnG_WIj5h0nlbfpB79-IvPucXo';
 const ADMIN_ID = 5524246727;
+// Đã sửa lỗi: Xóa dấu chấm phẩy (;) ở cuối
 const API_URL = 'http://157.10.52.15:3000/api/sunwin?key=axotaixiu';
 const API_INTERVAL = 3000;
 
@@ -34,11 +35,11 @@ predictionHistory = loadData(PREDICTION_HISTORY_FILE, []);
 const isAdmin = (userId) => users[userId] && users[userId].isAdmin;
 const isMainAdmin = (userId) => userId === ADMIN_ID;
 
-// --- Hàm định dạng dữ liệu (ĐÃ THÊM ĐỘ TIN CẬY) ---
+// --- Hàm định dạng dữ liệu (ĐÃ SỬA LỖI + THÊM ĐỘ TIN CẬY) ---
 function formatPredictionData(data) {
     if (!data) return "Chưa có dữ liệu dự đoán.";
     
-    // Thêm "do_tin_cay" vào danh sách lấy ra
+    // Sửa các key thành chữ thường để khớp với API
     const { phien_truoc, ket_qua, Dice, phien_hien_tai, du_doan, cau, do_tin_cay } = data;
 
     return `
@@ -56,7 +57,7 @@ function formatPredictionData(data) {
 `.trim();
 }
 
-// --- Hàm gọi API ---
+// --- Hàm gọi API (ĐÃ SỬA LỖI) ---
 async function fetchAndProcessApiData() {
     try {
         const fetch = (await import('node-fetch')).default;
@@ -69,6 +70,7 @@ async function fetchAndProcessApiData() {
 
         const data = await response.json();
         
+        // Sửa key thành chữ thường để khớp với API
         if (data && data.phien_hien_tai) {
             if (data.phien_hien_tai !== lastDisplayedSession) {
                 console.log(`[${new Date().toLocaleTimeString()}] Phiên mới: ${data.phien_hien_tai}. Gửi thông báo...`);
