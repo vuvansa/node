@@ -1,8 +1,10 @@
-// --- START OF FILE botsunwin_simplified.js ---
+// --- START OF FILE botsunwin_fixed.js ---
 
 const { Telegraf } = require('telegraf');
 const { readFileSync, writeFileSync, existsSync } = require('fs');
-const fetch = require('node-fetch');
+// Dòng require('node-fetch') đã được XÓA ở đây.
+// Chúng ta sẽ import nó theo cách khác bên dưới.
+
 // Cài đặt một trong hai thư viện proxy này, tùy thuộc vào loại proxy bạn có
 const { HttpsProxyAgent } = require('https-proxy-agent'); // Dành cho HTTP/HTTPS proxy
 // const { SocksProxyAgent } = require('socks-proxy-agent'); // Dành cho SOCKS proxy
@@ -11,12 +13,10 @@ const { HttpsProxyAgent } = require('https-proxy-agent'); // Dành cho HTTP/HTTP
 // !!! QUAN TRỌNG: Hãy thay thế bằng token MỚI của bạn sau khi đã thu hồi token cũ !!!
 const BOT_TOKEN = 'YOUR_NEW_BOT_TOKEN'; // THAY THẾ TOKEN CỦA BẠN VÀO ĐÂY
 const ADMIN_ID = 5524246727; // ID của admin chính
-// Đã sửa lỗi: loại bỏ dấu chấm phẩy (;) thừa ở cuối
 const API_URL = 'http://157.10.52.15:3000/api/sunwin?key=axotaixiu'; 
 const API_INTERVAL = 3000; // Tần suất gọi API (3 giây)
 
 // --- Cấu hình Proxy (Tùy chọn) ---
-// Điền thông tin proxy của bạn vào đây nếu cần, nếu không cứ để trống.
 const PROXY_URL = ''; // Ví dụ: 'http://user:password@your_proxy_ip:your_proxy_port'
 
 // --- Khởi tạo Bot với cấu hình Proxy ---
@@ -63,7 +63,6 @@ function saveData(filePath, data) {
 }
 
 // --- Tải dữ liệu khi khởi động ---
-// Đơn giản hóa: không còn keyUsed. Admin mặc định active.
 users = loadData(USERS_FILE, { [ADMIN_ID]: { active: true, isAdmin: true } });
 predictionHistory = loadData(PREDICTION_HISTORY_FILE, []);
 
@@ -94,6 +93,10 @@ function formatPredictionData(data) {
 // --- Hàm gọi API và gửi thông báo ---
 async function fetchAndProcessApiData() {
     try {
+        // **ĐÂY LÀ THAY ĐỔI QUAN TRỌNG ĐỂ SỬA LỖI**
+        // Tải thư viện node-fetch bằng import() động
+        const fetch = (await import('node-fetch')).default;
+
         const response = await fetch(API_URL);
         if (!response.ok) {
             console.error(`Lỗi API: HTTP status ${response.status}`);
@@ -115,12 +118,11 @@ async function fetchAndProcessApiData() {
 
             const formattedMessage = formatPredictionData(data);
             
-            // Gửi cho tất cả người dùng đang "active"
             for (const userId in users) {
                 if (users[userId].active) {
                     bot.telegram.sendMessage(userId, formattedMessage, { parse_mode: 'Markdown' }).catch(e => {
                         console.error(`Không thể gửi tin nhắn tới user ${userId}:`, e.message);
-                        if (e.code === 403) { // 403 Forbidden: Thường là do người dùng block bot
+                        if (e.code === 403) {
                             console.log(`User ${userId} đã chặn bot. Đánh dấu là inactive.`);
                             users[userId].active = false;
                             saveData(USERS_FILE, users);
@@ -139,13 +141,12 @@ bot.start((ctx) => {
     const userId = ctx.from.id;
     const userName = ctx.from.username || ctx.from.first_name;
 
-    // Tự động thêm người dùng mới và kích hoạt họ
     if (!users[userId]) {
         users[userId] = { active: true, isAdmin: false };
         saveData(USERS_FILE, users);
         console.log(`Người dùng mới: ${userId} (${userName})`);
     } else {
-        users[userId].active = true; // Kích hoạt lại nếu họ đã tắt bot trước đó
+        users[userId].active = true;
         saveData(USERS_FILE, users);
     }
 
@@ -176,7 +177,6 @@ bot.start((ctx) => {
 bot.command('chaybot', (ctx) => {
     const userId = ctx.from.id;
     if (!users[userId]) {
-        // Trường hợp hiếm gặp, nhưng nên có
         users[userId] = { active: true, isAdmin: false };
     }
     
@@ -196,8 +196,7 @@ bot.command('tatbot', (ctx) => {
 });
 
 
-// --- Các lệnh Admin (giữ nguyên, chỉ chỉnh sửa /check) ---
-
+// --- Các lệnh Admin ---
 bot.command('addadmin', (ctx) => {
     if (!isMainAdmin(ctx.from.id)) return ctx.reply('Chỉ admin chính mới có quyền này.');
     const targetUserId = parseInt(ctx.message.text.split(' ')[1], 10);
@@ -243,23 +242,18 @@ bot.command('thongbao', (ctx) => {
     if (!message) return ctx.reply('Vui lòng nhập nội dung thông báo.');
 
     const broadcastMessage = `📣 *THÔNG BÁO TỪ ADMIN:*\n\n${message}`;
-    let successCount = 0;
     Object.keys(users).forEach(userId => {
-        // Gửi cho tất cả, không chỉ những người active
         bot.telegram.sendMessage(userId, broadcastMessage, { parse_mode: 'Markdown' })
-            .then(() => successCount++)
             .catch(e => console.error(`Lỗi gửi thông báo tới ${userId}:`, e.message));
     });
-    ctx.reply(`Đã gửi thông báo tới người dùng (sẽ cố gắng gửi cho tất cả).`);
+    ctx.reply(`Đã gửi thông báo tới người dùng.`);
 });
 
 // --- Khởi động bot ---
 bot.launch().then(() => {
-    console.log('Bot Sunwin (phiên bản đơn giản) đã khởi động!');
-    // Luôn chạy interval để lấy dữ liệu.
+    console.log('Bot Sunwin (phiên bản đã sửa lỗi) đã khởi động!');
     setInterval(fetchAndProcessApiData, API_INTERVAL);
     console.log(`Bắt đầu lấy dữ liệu API mỗi ${API_INTERVAL / 1000} giây.`);
-    // Lấy dữ liệu lần đầu ngay lập tức
     fetchAndProcessApiData();
 }).catch((err) => {
     console.error('Lỗi khi khởi động Bot:', err);
